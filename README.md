@@ -1,10 +1,15 @@
 ---
-title: kling_video_gradio
-app_file: my_gradio.py
+title: 可灵ai视频_gradio
+app_file: gradio_image_*.py
 sdk: gradio
 sdk_version: 5.0.1
 ---
-# kling_video_gradio
+# 可灵ai 视频生成
+
+* 快手可灵ai视频生成gradio界面，功能与可灵ai页面基本一致。
+* 支持并发数为3
+* gradio页面中文生视频和图生视频可同时进行
+
 
 ## use gradio create kling video UI for txt2video and img2video
 
