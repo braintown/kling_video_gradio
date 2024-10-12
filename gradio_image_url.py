@@ -3,43 +3,16 @@ import json
 import requests
 import time
 import jwt
-import pymysql
 from PIL import Image
 from io import BytesIO
 import aiohttp
 import asyncio
-from datetime import datetime
+import os
 
 
+ak = os.environ.get("ak", None)  # 填写access key
+sk = os.environ.get("sk", None)  # 填写secret key
 
-# 数据库初始化
-def init_db():
-    conn = pymysql.connect(
-        host='10.7.100.28',
-        user='root',
-        password='gempoll',
-        db='kling_data'
-    )
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS VideoRecords (
-                    id VARCHAR(255) PRIMARY KEY,
-                    payload TEXT,
-                    video_url TEXT,
-                    time DATETIME
-                )
-            ''')
-        conn.commit()
-    finally:
-        conn.close()
-
-
-
-init_db()
-
-ak = ""  # 填写access key
-sk = ""  # 填写secret key
 
 
 def encode_jwt_token(ak, sk):
@@ -58,26 +31,6 @@ def encode_jwt_token(ak, sk):
 
 url_txt = "https://api.klingai.com/v1/videos/text2video"
 url_img = "https://api.klingai.com/v1/videos/image2video"
-
-
-# 插入数据到数据库
-def insert_video_record(video_id, payload, video_url):
-    try:
-        conn = pymysql.connect(
-            host='10.7.100.28',
-            user='root',
-            password='gempoll',
-            db='kling_data'
-        )
-        with conn.cursor() as cursor:
-            query = 'INSERT INTO VideoRecords (id, payload, video_url, time) VALUES (%s, %s, %s, %s)'
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            cursor.execute(query, (video_id, payload, video_url, current_time))
-        conn.commit()
-    except Exception as e:
-        print("Error inserting to database:", e)
-    finally:
-        conn.close()
 
 
 def generate_video(token, model, prompt, negative, mode, aspect_ratio, duration, weight, control_type, config):
@@ -126,9 +79,6 @@ def generate_video(token, model, prompt, negative, mode, aspect_ratio, duration,
     video_id = video_data["id"]
 
     print("Generated Video ID:", video_id)
-
-    # 插入记录到数据库
-    insert_video_record(video_id, payload_str, video_url)
 
     return video_id, video_url
 
@@ -217,7 +167,6 @@ def process_image_to_video(token, model, image, tail_image, prompt, negative, mo
 
     print("Generated Video ID:", video_id)
 
-    insert_video_record(video_id, payload_str, video_url)
     # 更新历史记录
     history_videos_img.append((video_id, video_url))
     display_choices = [f"{i + 1}. {video_id}" for i, (video_id, _) in enumerate(history_videos_img)]

@@ -5,10 +5,11 @@ import time
 import jwt
 import base64
 from io import BytesIO
+import os
 
 
-ak = ""  # 填写access key
-sk = ""  # 填写secret key
+ak = os.environ.get("ak", None)  # 填写access key
+sk = os.environ.get("sk", None)  # 填写secret key
 
 
 def encode_jwt_token(ak, sk):

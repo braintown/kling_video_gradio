@@ -16,3 +16,8 @@ sdk_version: 5.0.1
 * gradio_image_base64.py is the base64 image to video
 * gradio_image_url.py is the url image to video,need to setting the oss url
 * [kling_video_gradio](https://github.com/braintown/kling_video_gradio.git)
+
+## Usage
+### Prerequisite: [Kling](https://kling.ai/) API Key
+1. Set the `ak` and `sk` in environment before gradio starts or set it on the node.
+
