@@ -8,8 +8,8 @@ from io import BytesIO
 import os
 
 
-ak = os.environ.get("ak", None)  # 填写access key
-sk = os.environ.get("sk", None)  # 填写secret key
+ak = os.environ.get('ACCESS_KEY', None)  # 填写access key
+sk = os.environ.get('SECRET_KEY', None)  # 填写secret key
 
 
 def encode_jwt_token(ak, sk):
@@ -149,6 +149,22 @@ def process_image_to_video(token, model, image, tail_image, prompt, negative, mo
 
     return video_url, gr.update(choices=display_choices), history_videos_img
 
+# 映射字典
+control_type_mapping = {
+    "无": "none",
+    "自定义": "simple",
+    "下退": "down_back",
+    "前进": "forward_up",
+    "右转前进": "right_turn_forward",
+    "左转前进": "left_turn_forward"
+}
+
+
+# 函数将中文转换为英文
+def translate_control_type(chosen_type):
+    return control_type_mapping[chosen_type]
+
+
 
 with gr.Blocks() as demo:
     gr.Markdown("# 视频生成工具")
@@ -158,7 +174,7 @@ with gr.Blocks() as demo:
             with gr.Row():
                 with gr.Column():
                     model = gr.Dropdown(choices=["kling-v1"], label="模型选择", value="kling-v1")
-                    text_input = gr.Textbox(label="正向提示词(必填)", value="1 cadillac car driving behind the sea")
+                    text_input = gr.Textbox(label="正向提示词(必填)(支持中文)", value="1 cadillac car driving behind the sea")
                     negative = gr.Textbox(label="反向提示词(选填)", value="")
                     mode = gr.Dropdown(choices=["std", "pro"], label="std:更快，pro:质量更好", value="std")
                     aspect_ratio = gr.Dropdown(choices=["16:9", "9:16", "1:1"], label="视频比例", value="16:9")

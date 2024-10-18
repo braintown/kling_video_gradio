@@ -19,5 +19,5 @@ sdk_version: 5.0.1
 
 ## Usage
 ### Prerequisite: [Kling](https://kling.ai/) API Key
-1. Set the `ak` and `sk` in environment before gradio starts or set it on the node.
+1. Set the `ACCESS_KEY` and `SECRET_KEY` in environment before gradio starts or set it on the node.
 
