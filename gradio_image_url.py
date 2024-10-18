@@ -17,29 +17,6 @@ SECRET_KEY = os.environ.get('SECRET_KEY', None)  # 填写secret key
 URL_TEXT2VIDEO = "https://api.klingai.com/v1/videos/text2video"
 URL_IMAGE2VIDEO = "https://api.klingai.com/v1/videos/image2video"
 
-# 数据库初始化
-def init_db():
-    conn = pymysql.connect(
-        host='10.7.100.28',
-        user='root',
-        password='gempoll',
-        db='kling_data'
-    )
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS VideoRecords (
-                    id VARCHAR(255) PRIMARY KEY,
-                    payload TEXT,
-                    video_url TEXT,
-                    time DATETIME
-                )
-            ''')
-        conn.commit()
-    finally:
-        conn.close()
-
-init_db()
 
 def encode_jwt_token(ak, sk):
     headers = {
@@ -53,25 +30,6 @@ def encode_jwt_token(ak, sk):
     }
     token = jwt.encode(payload, sk, headers=headers)
     return token
-
-# 插入数据到数据库
-def insert_video_record(video_id, payload, video_url):
-    try:
-        conn = pymysql.connect(
-            host='10.7.100.28',
-            user='root',
-            password='gempoll',
-            db='kling_data'
-        )
-        with conn.cursor() as cursor:
-            query = 'INSERT INTO VideoRecords (id, payload, video_url, time) VALUES (%s, %s, %s, %s)'
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            cursor.execute(query, (video_id, payload, video_url, current_time))
-        conn.commit()
-    except Exception as e:
-        print("Error inserting to database:", e)
-    finally:
-        conn.close()
 
 def generate_video(token, model, prompt, negative, mode, aspect_ratio, duration, weight, control_type, config):
     headers = {
@@ -123,8 +81,7 @@ def generate_video(token, model, prompt, negative, mode, aspect_ratio, duration,
 
     print("Generated Video ID:", video_id)
 
-    # 插入记录到数据库
-    insert_video_record(video_id, payload_str, video_url)
+
     return video_id, video_url
 
 async def upload_image_to_blob(image: Image, requested_url: str):
@@ -156,6 +113,9 @@ def process_image_to_video(token, model, image, tail_image, prompt, negative, mo
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     }
+    if not prompt:
+        return gr.update(value="<span style='color:red; font-size: 20px;'>提示词必填</span>",
+                         visible=True), None, None, None
     # 异步上传图片并获取 URL
     async def upload_images():
         img_url = await upload_image_to_blob(image, URL_IMAGE2VIDEO) if image is not None else ""
@@ -205,7 +165,6 @@ def process_image_to_video(token, model, image, tail_image, prompt, negative, mo
     video_id = video_data["id"]
 
     print("Generated Video ID:", video_id)
-    insert_video_record(video_id, payload_str, video_url)
     # 更新历史记录
     history_videos_img.append((video_id, video_url))
     display_choices = [f"{i + 1}. {video_id}" for i, (video_id, _) in enumerate(history_videos_img)]
@@ -355,6 +314,7 @@ with gr.Blocks() as demo:
                     generate_button_img = gr.Button("生成视频")
                 with gr.Column():
                     video_output_img = gr.Video(label="生成的视频")
+                    error_output_img = gr.Markdown("", visible=False)  # 用于显示错误信息
                 with gr.Column():
                     history_videos_state_img = gr.State([])
                     history_list_img = gr.Dropdown(choices=[], label="历史视频")
@@ -369,7 +329,7 @@ with gr.Blocks() as demo:
                 ),
                 inputs=[model, image_input, image_tail, text_input, negative, mode, duration, weight_slider,
                         history_videos_state_img],
-                outputs=[video_output_img, history_list_img, history_videos_state_img]
+                outputs=[error_output_img, video_output_img, history_list_img, history_videos_state_img]
             )
 
 
