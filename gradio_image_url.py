@@ -1,5 +1,3 @@
-import os
-
 import gradio as gr
 import json
 import requests
@@ -11,12 +9,36 @@ from io import BytesIO
 import aiohttp
 import asyncio
 from datetime import datetime
+import os
 
 ACCESS_KEY = os.environ.get('ACCESS_KEY', None)  # 填写access key
 SECRET_KEY = os.environ.get('SECRET_KEY', None)  # 填写secret key
 URL_TEXT2VIDEO = "https://api.klingai.com/v1/videos/text2video"
 URL_IMAGE2VIDEO = "https://api.klingai.com/v1/videos/image2video"
 
+# 数据库初始化
+def init_db():
+    conn = pymysql.connect(
+        host='10.7.100.28',
+        user='root',
+        password='gempoll',
+        db='kling_data'
+    )
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS VideoRecords (
+                    id VARCHAR(255) PRIMARY KEY,
+                    payload TEXT,
+                    video_url TEXT,
+                    time DATETIME
+                )
+            ''')
+        conn.commit()
+    finally:
+        conn.close()
+
+init_db()
 
 def encode_jwt_token(ak, sk):
     headers = {
@@ -30,6 +52,25 @@ def encode_jwt_token(ak, sk):
     }
     token = jwt.encode(payload, sk, headers=headers)
     return token
+
+# 插入数据到数据库
+def insert_video_record(video_id, payload, video_url):
+    try:
+        conn = pymysql.connect(
+            host='10.7.100.28',
+            user='root',
+            password='gempoll',
+            db='kling_data'
+        )
+        with conn.cursor() as cursor:
+            query = 'INSERT INTO VideoRecords (id, payload, video_url, time) VALUES (%s, %s, %s, %s)'
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            cursor.execute(query, (video_id, payload, video_url, current_time))
+        conn.commit()
+    except Exception as e:
+        print("Error inserting to database:", e)
+    finally:
+        conn.close()
 
 def generate_video(token, model, prompt, negative, mode, aspect_ratio, duration, weight, control_type, config):
     headers = {
@@ -81,14 +122,15 @@ def generate_video(token, model, prompt, negative, mode, aspect_ratio, duration,
 
     print("Generated Video ID:", video_id)
 
-
+    # 插入记录到数据库
+    insert_video_record(video_id, payload_str, video_url)
     return video_id, video_url
 
 async def upload_image_to_blob(image: Image, requested_url: str):
     img_byte_arr = BytesIO()
     image.save(img_byte_arr, format="PNG")
     img_byte_arr = img_byte_arr.getvalue()
-    url = "https://ai-dev.gempoll.com/v2/api/workbench/uploadBlob"
+    url = os.environ.get('OSS_URL', None)  #填写oss_url地址
     async with aiohttp.ClientSession() as session:
         data = aiohttp.FormData()
         data.add_field("file", img_byte_arr, filename="image.png", content_type='image/png')
@@ -113,9 +155,12 @@ def process_image_to_video(token, model, image, tail_image, prompt, negative, mo
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     }
+
+    # 如果提示词为空，则显示错误信息
     if not prompt:
-        return gr.update(value="<span style='color:red; font-size: 20px;'>提示词必填</span>",
-                         visible=True), None, None, None
+        return gr.update(value="<span style='color:red; font-size: 20px;'>提示词必填，不然会有弹窗错误</span>",
+                         visible=True), None, None, history_videos_img
+
     # 异步上传图片并获取 URL
     async def upload_images():
         img_url = await upload_image_to_blob(image, URL_IMAGE2VIDEO) if image is not None else ""
@@ -135,6 +180,7 @@ def process_image_to_video(token, model, image, tail_image, prompt, negative, mo
         "image": img_url,  # 修改为 URL
         "image_tail": tail_img_url  # 修改为 URL
     }
+
     payload_str = json.dumps(payload)
     print("payload_str", payload_str)
 
@@ -144,13 +190,14 @@ def process_image_to_video(token, model, image, tail_image, prompt, negative, mo
     # 检查响应
     if response.status_code != 200:
         print(f"错误：{response.status_code}")
-        return None, None, history_videos_img
+        return None, None, None, history_videos_img
 
     # 结果处理
     ids = json.loads(response.text)["data"]["task_id"]
     print("Task ID:", ids)
 
     url_video = f"https://api.klingai.com/v1/videos/image2video/{ids}"
+
     result = json.loads(requests.get(url_video, headers=headers).text)["data"]["task_status"]
     print("Initial Task Status:", result)
 
@@ -165,11 +212,14 @@ def process_image_to_video(token, model, image, tail_image, prompt, negative, mo
     video_id = video_data["id"]
 
     print("Generated Video ID:", video_id)
+
+    insert_video_record(video_id, payload_str, video_url)
     # 更新历史记录
     history_videos_img.append((video_id, video_url))
     display_choices = [f"{i + 1}. {video_id}" for i, (video_id, _) in enumerate(history_videos_img)]
 
-    return video_url, gr.update(choices=display_choices), history_videos_img
+    # 返回空字符串表示没有错误
+    return gr.update(value="", visible=False), video_url, gr.update(choices=display_choices), history_videos_img
 
 
 # 映射字典
@@ -356,5 +406,5 @@ with gr.Blocks() as demo:
         outputs=video_output_img
     )
 
-demo.launch(server_name="0.0.0.0", server_port=1111, share=False)
+demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
 

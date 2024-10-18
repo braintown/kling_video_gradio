@@ -94,9 +94,11 @@ def process_image_to_video(token, model, image, tail_image, prompt, negative, mo
         'Accept': 'application/json'
     }
 
+    # 如果提示词为空，则显示错误信息
     if not prompt:
-        return gr.update(value="<span style='color:red; font-size: 20px;'>提示词必填</span>",
-                         visible=True), None, None, None
+        return gr.update(value="<span style='color:red; font-size: 20px;'>提示词必填，不然会有弹窗错误</span>",
+                         visible=True), None, None, history_videos_img
+
     # 转换上传的图片和尾帧图片为Base64
     img_base64 = pil_to_base64(image) if image is not None else ""
     tail_img_base64 = pil_to_base64(tail_image) if tail_image is not None else ""
@@ -147,7 +149,7 @@ def process_image_to_video(token, model, image, tail_image, prompt, negative, mo
     history_videos_img.append((video_id, video_url))
     display_choices = [f"{i + 1}. {video_id}" for i, (video_id, _) in enumerate(history_videos_img)]
 
-    return video_url, gr.update(choices=display_choices), history_videos_img
+    return gr.update(value="", visible=False), video_url, gr.update(choices=display_choices), history_videos_img
 
 
 # 映射字典
@@ -335,4 +337,4 @@ with gr.Blocks() as demo:
         outputs=video_output_img
     )
 
-demo.launch(server_name="0.0.0.0", server_port=1111, share=False)
+demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
